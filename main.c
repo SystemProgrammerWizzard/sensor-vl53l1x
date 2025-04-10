@@ -127,11 +127,8 @@ int main(void)
     // Create the FIFO if it doesn't exist
     if (mkfifo(FIFO_PATH, 0666) == -1)
     {
-        if (errno != EEXIST)
-        {
-            perror("mkfifo");
-            return 1;
-        }
+        printf("FIFO already exists or error creating FIFO\n");
+        exit(1);
     }
 
     // Initialize I2C and VL53L1X sensor
@@ -170,7 +167,7 @@ int main(void)
         {
             VL53L1X_ClearInterrupt(I2C_ADDRESS);
 
-            // Send raw binary value (suitable for another C program or binary protocol)
+            
             if (write(fifo_fd, &distance, sizeof(distance)) < 0)
             {
                 perror("Write to FIFO failed");
