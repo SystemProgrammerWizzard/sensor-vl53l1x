@@ -7,7 +7,7 @@ include_directories(
 )
 
 set(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/sensor.c
+    ${CMAKE_SOURCE_DIR}/main.c
     ${CMAKE_SOURCE_DIR}/vl53l1x/VL53L1X_api.c
     ${CMAKE_SOURCE_DIR}/vl53l1x/VL53L1X_calibration.c
     ${CMAKE_SOURCE_DIR}/vl53l1x/vl53l1_platform.c
