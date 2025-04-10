@@ -9,6 +9,7 @@
 
 #define I2C_DEVICE "/dev/i2c-1"
 #define I2C_ADDRESS 0x29
+#define FIFO_PATH "/tmp/fifo"
 
 static int i2c_fd = -1;
 
@@ -120,11 +121,14 @@ int8_t VL53L1_WaitMs(uint16_t dev, int32_t wait_ms)
 
 int main(void)
 {
+    int fifo_fd;
     if (init_i2c() < 0)
         return 1;
 
     VL53L1X_SensorInit(I2C_ADDRESS);
     VL53L1X_StartRanging(I2C_ADDRESS);
+
+    fifo_fd = open(FIFO_PATH, O_WRONLY | O_NONBLOCK);
 
     while (1)
     {
@@ -136,7 +140,10 @@ int main(void)
         VL53L1X_GetDistance(I2C_ADDRESS, &distance);
         VL53L1X_ClearInterrupt(I2C_ADDRESS);
 
-        printf("Distance: %u mm\n", distance);
+        if (fifo_fd >= 0)
+        {
+            write(fifo_fd, &distance, sizeof(distance));
+        }
         usleep(100000);
     }
 
