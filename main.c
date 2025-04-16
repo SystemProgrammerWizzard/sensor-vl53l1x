@@ -6,9 +6,11 @@
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 #define I2C_DEVICE "/dev/i2c-1"
 #define I2C_ADDRESS 0x29
+#define FIFO_PATH "/tmp/fifo"
 
 static int i2c_fd = -1;
 
@@ -120,12 +122,40 @@ int8_t VL53L1_WaitMs(uint16_t dev, int32_t wait_ms)
 
 int main(void)
 {
+    int fifo_fd;
+
+    // Create the FIFO if it doesn't exist
+    if (mkfifo(FIFO_PATH, 0666) == -1)
+    {
+        printf("FIFO already exists or error creating FIFO\n");
+        exit(1);
+    }
+
+    // Initialize I2C and VL53L1X sensor
     if (init_i2c() < 0)
         return 1;
 
-    VL53L1X_SensorInit(I2C_ADDRESS);
-    VL53L1X_StartRanging(I2C_ADDRESS);
+    if (VL53L1X_SensorInit(I2C_ADDRESS) != 0)
+    {
+        fprintf(stderr, "Sensor initialization failed\n");
+        return 1;
+    }
 
+    if (VL53L1X_StartRanging(I2C_ADDRESS) != 0)
+    {
+        fprintf(stderr, "Sensor ranging start failed\n");
+        return 1;
+    }
+
+    // Open the FIFO for writing (this blocks until reader opens it)
+    fifo_fd = open(FIFO_PATH, O_WRONLY);
+    if (fifo_fd < 0)
+    {
+        perror("Failed to open FIFO for writing");
+        return 1;
+    }
+
+    // Main measurement loop
     while (1)
     {
         uint8_t ready = 0;
@@ -133,12 +163,21 @@ int main(void)
             VL53L1X_CheckForDataReady(I2C_ADDRESS, &ready);
 
         uint16_t distance = 0;
-        VL53L1X_GetDistance(I2C_ADDRESS, &distance);
-        VL53L1X_ClearInterrupt(I2C_ADDRESS);
+        if (VL53L1X_GetDistance(I2C_ADDRESS, &distance) == 0)
+        {
+            VL53L1X_ClearInterrupt(I2C_ADDRESS);
 
-        printf("Distance: %u mm\n", distance);
-        usleep(100000);
+            
+            if (write(fifo_fd, &distance, sizeof(distance)) < 0)
+            {
+                perror("Write to FIFO failed");
+                break;
+            }
+        }
+
+        usleep(100000); // 100ms delay between samples
     }
 
+    close(fifo_fd);
     return 0;
 }
